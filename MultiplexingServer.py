@@ -1,18 +1,68 @@
 from socket import *
 import _thread
 
-serverName='localhost'
-multiplexingPort=12000
-serverPort=12001
+QuizServerName='localhost'
+QuizServerPort=12001
+
+MultiplexingServerName = 'localhost'
+MultiplexingServerPort=12000
+
+MultiplexingServerSocket = socket(AF_INET,SOCK_STREAM)
+MultiplexingServerSocket.bind((MultiplexingServerName, MultiplexingServerPort))
+MultiplexingServerSocket.listen(1)
+
+connections = {}
+
+def handleGetRequest (connectionSocket, address, request):
+    questionNumber = request['Path'].split('_')[-1].split('.')[0]
+    try:
+        QuizServerSocket = socket(AF_INET, SOCK_STREAM)
+        QuizServerSocket.connect((QuizServerName, QuizServerPort))
+        QuizServerSocket.send(questionNumber.encode())
+        try:
+            Question = QuizServerSocket.recv(1024)
+            connectionSocket.send('HTTP/1.0 200 OK\n'.encode())
+            connectionSocket.send('Content-Type: text/html\n'.encode())
+            connectionSocket.send('\n'.encode())
+            connectionSocket.send(Question)
+            connections[address] = 'Active'
+        except:
+            print('Can not get data from the server')
+
+        QuizServerSocket.close()
+
+    except:
+        print('Can not communicate with server')
 
 
-multiplexingSocket = socket(AF_INET,SOCK_STREAM)
-multiplexingSocket.bind(('localhost', multiplexingPort))
-multiplexingSocket.listen(1)
+def handlePostRequest (connectionSocket, address, request, postData):
+    questionNumber = request['Path'].split('_')[-1].split('.')[0]
+    client = address[0] + ':' + str(address[1])
+    data = questionNumber + ',' + postData + ',' + client
+    print(data)
+    try:
+        QuizServerSocket = socket(AF_INET, SOCK_STREAM)
+        QuizServerSocket.connect((QuizServerName, QuizServerPort))
+        QuizServerSocket.send(data.encode())
+        try:
+            reply = QuizServerSocket.recv(1024)
+            connectionSocket.send('HTTP/1.0 200 OK\n'.encode())
+            connectionSocket.send('Content-Type: text/html\n'.encode())
+            connectionSocket.send('\n'.encode())
+            connectionSocket.send(reply)
+        except:
+            print('Can not get the correct answer from the server')
+
+        QuizServerSocket.close()
+
+    except:
+        print('Can not send answer to the server')
 
 
 def handleRequest (connectionSocket, address):
-    print ('Connected from', address)
+    client = address[0] + ':' + str(address[1])
+    print('Thread created for', client)
+    print ('Connected from', client)
     while True:
         try:
             message = connectionSocket.recv(1024)
@@ -22,80 +72,37 @@ def handleRequest (connectionSocket, address):
             break
 
         print (message)
+        decoded = message.decode()
 
-        if message.decode() == '':
+        if decoded == '':
             break
         else:
-            if (message.decode()[0] != 'G' and message.decode()[0] != 'P'):
+            if (decoded[0] != 'G' and decoded[0] != 'P'):
                 continue
 
-        request, _message = message.decode().split('\r\n', 1)
+        _request, _message = message.decode().split('\r\n', 1)
 
-        m = {}
-        m['Method'], m['Path'], m['http-version'] = request.split(' ')
+        request = {}
+        request['Method'], request['Path'], request['http-version'] = _request.split(' ')
 
-        if m['Method'] == 'GET':
-            questionNumber = m['Path'].split('_')[-1].split('.')[0]
-            try:
-                serverSocket = socket(AF_INET, SOCK_STREAM)
-                serverSocket.connect(('localhost', serverPort))
-                serverSocket.send(questionNumber.encode())
-                try:
-                    Question = serverSocket.recv(1024)
-                    connectionSocket.send('HTTP/1.0 200 OK\n'.encode())
-                    connectionSocket.send('Content-Type: text/html\n'.encode())
-                    connectionSocket.send('\n'.encode())
-                    connectionSocket.send(Question)
-                    connections[address] = 'Active'
-                except:
-                    print('Can not get data from the server')
-            except:
-                print ('Can not communicate with server')
+        if request['Method'] == 'GET':
+            handleGetRequest(connectionSocket,address, request)
 
-            serverSocket.close()
-
-
-        if m['Method'] == 'POST' and m['Path'] != '/favicon.ico':
-            answer = message.decode().split('\r\n')[-1].split('=')[-1]
-            questionNumber = m['Path'].split('_')[-1].split('.')[0]
-            client = address[0] + ':' + str(address[1])
-            data = answer + '.' + questionNumber + '.' + client
-            print(data)
-            try:
-                serverSocket = socket(AF_INET, SOCK_STREAM)
-                serverSocket.connect(('localhost', serverPort))
-                serverSocket.send(data.encode())
-                try:
-                    reply = serverSocket.recv(1024)
-                    connectionSocket.send('HTTP/1.0 200 OK\n'.encode())
-                    connectionSocket.send('Content-Type: text/html\n'.encode())
-                    connectionSocket.send('\n'.encode())
-                    connectionSocket.send(reply)
-                except:
-                    print ('Can not get the correct answer from the server')
-            except:
-                print ('Can not send answer to the server')
-
-            serverSocket.close()
+        if request['Method'] == 'POST' and request['Path'] != '/favicon.ico':
+            postData =  message.decode().split('\r\n')[-1].split('=')[-1]
+            handlePostRequest(connectionSocket, address, request, postData)
 
     connectionSocket.close()
 
-connections = {}
 
 while True:
 
-    print ('Ready to serve on port' ,multiplexingPort)
-    connectionSocket, address =  multiplexingSocket.accept()
-    connectionSocket.settimeout(10)
-    connections[address] = 'Idle'
+    print ('Ready to serve on port' ,MultiplexingServerPort)
 
-    client = address[0] + ':' + str(address[1])
-    print ('Thread created for', client)
-    _thread.start_new_thread(handleRequest, (connectionSocket, address))
+    ConnectionSocket, address =  MultiplexingServerSocket.accept()
+    ConnectionSocket.settimeout(10)
 
-    for keys, values in connections.items():
-        print(keys)
-        print(values)
+    _thread.start_new_thread(handleRequest, (ConnectionSocket, address))
 
 
 

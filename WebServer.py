@@ -1,53 +1,77 @@
 from socket import *
+import re
 
-serverPort=12001
-serverSocket = socket(AF_INET,SOCK_STREAM)
+QuizServerName = 'localhost'
+QuizServerPort = 12001
 
-serverSocket.bind(('localhost', serverPort))
-serverSocket.listen(1)
+QuizServerSocket = socket(AF_INET,SOCK_STREAM)
+QuizServerSocket.bind(('localhost', QuizServerPort))
+QuizServerSocket.listen(1)
 
-answers = ['trump', 'staryu', 'oak', 'rengar']
+Answers = ['trump', 'staryu', 'oak', 'rengar', 'hioneum', 'dubrovnik', '97', 'depp', 'tail', 'franklin']
+AnswerInfo = [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}]
 
-answer_info = [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}]
 
-while True:
+def handleRequest(connectionSocket, address):
+    client = address[0] + ':' + str(address[1])
+    print('Quiz Server Connected From', client)
 
-    print ('Ready to serve on port', serverPort)
-    connectionSocket,addr =  serverSocket.accept()
-    print ('connected from',addr)
+    try:
+        message = connectionSocket.recv(1024)
+    except:
+        print ('Connection Lost')
+        return
 
-    message = connectionSocket.recv(1024)
     print(message)
+    decoded = message.decode()
 
-    if message.decode() == '' or message.decode() == '/favicon':
-        continue
+    if decoded[0] == '/':
+        if re.search(r"/Results*", decoded):
+            Client = decoded.split(',')[-1]
+            print('Results are requested by', Client)
+            ClientPoints = 0
+            for k in AnswerInfo:
+                if Client in k:
+                    if k[Client] == 'true':
+                        ClientPoints += 1
+                else:
+                    print('Client did not participate in this question.')
+                    continue
+            print (ClientPoints)
+            connectionSocket.send(str(ClientPoints).encode())
+        else:
+            exit(1)
 
     else:
-        if message.decode().isdigit():
-            fileName = 'Questions/Question_' + str(message.decode()) + '.html'
+        try:
+            integer = int(decoded)
+            FileName = 'Questions/Question_' + decoded + '.html'
+        except:
+            QuestionNumber, Answer, Client = decoded.split(',')
+            FileName = 'Questions/Question_' + QuestionNumber + '.html'
 
-            sendData = ''
-            with open(fileName, 'r') as myfile:
-                sendData = myfile.read().replace('\n', '')
-
-            connectionSocket.send(sendData.encode())  # Use triple-quote string.
-
-        else:
-            answer = message.decode().split('.')[0]
-            q_number = message.decode().split('.')[1]
-            client = message.decode().split('.')[2]
-
-            fileName = 'Questions/Question_' + (q_number) + '.html'
-            with open(fileName, 'r') as myfile:
-                sendData = myfile.read().replace('\n', '')
-
-            if answer in answers:
-                answer_info[int(q_number) - 1][client] = 'true'
+            if Answer in Answers:
+                AnswerInfo[int(QuestionNumber) - 1][Client] = 'true'
             else:
-                answer_info[int(q_number) - 1][client] = 'false'
+                AnswerInfo[int(QuestionNumber) - 1][Client] = 'false'
 
-            connectionSocket.send(sendData.encode())
+        SendData = ''
+        try:
+            with open(FileName, 'r') as MyFile:
+                SendData = MyFile.read().replace('\n', '')
+        except:
+            print ('Requested file can not be opened or found')
+            SendData = 'not-found'
+
+        connectionSocket.send(SendData.encode())
 
     connectionSocket.close()
 
-serverSocket.close()
+
+while True:
+
+    print ('Ready to serve on port', QuizServerPort)
+    connectionSocket,address =  QuizServerSocket.accept()
+    handleRequest(connectionSocket,address)
+
+QuizServerSocket.close()
