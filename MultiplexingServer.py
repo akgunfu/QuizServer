@@ -11,10 +11,16 @@ MultiplexingServerSocket = socket(AF_INET,SOCK_STREAM)
 MultiplexingServerSocket.bind((MultiplexingServerName, MultiplexingServerPort))
 MultiplexingServerSocket.listen(1)
 
-connections = {}
 
 def handleGetRequest (connectionSocket, address, request):
-    questionNumber = request['Path'].split('_')[-1].split('.')[0]
+    try:
+        questionNumber = request['Path'].split('_')[-1].split('.')[0]
+        integer = int(questionNumber)
+    except:
+        print ('Invalid Request')
+        #connectionSocket.send('HTTP/1.0 404 NOT-FOUND'.encode())
+        return
+
     try:
         QuizServerSocket = socket(AF_INET, SOCK_STREAM)
         QuizServerSocket.connect((QuizServerName, QuizServerPort))
@@ -25,7 +31,6 @@ def handleGetRequest (connectionSocket, address, request):
             connectionSocket.send('Content-Type: text/html\n'.encode())
             connectionSocket.send('\n'.encode())
             connectionSocket.send(Question)
-            connections[address] = 'Active'
         except:
             print('Can not get data from the server')
 
@@ -36,9 +41,9 @@ def handleGetRequest (connectionSocket, address, request):
 
 
 def handlePostRequest (connectionSocket, address, request, postData):
-    questionNumber = request['Path'].split('_')[-1].split('.')[0]
-    client = address[0] + ':' + str(address[1])
-    data = questionNumber + ',' + postData + ',' + client
+    questionNumberOrPath = request['Path'].split('_')[-1].split('.')[0]
+    client = address[0]
+    data = questionNumberOrPath + ',' + postData + ',' + client
     print(data)
     try:
         QuizServerSocket = socket(AF_INET, SOCK_STREAM)

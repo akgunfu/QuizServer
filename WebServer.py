@@ -13,13 +13,14 @@ AnswerInfo = [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}]
 
 
 def handleRequest(connectionSocket, address):
-    client = address[0] + ':' + str(address[1])
+    client = address[0]
     print('Quiz Server Connected From', client)
 
     try:
         message = connectionSocket.recv(1024)
     except:
         print ('Connection Lost')
+        connectionSocket.close()
         return
 
     print(message)
@@ -37,23 +38,26 @@ def handleRequest(connectionSocket, address):
                 else:
                     print('Client did not participate in this question.')
                     continue
-            print (ClientPoints)
-            connectionSocket.send(str(ClientPoints).encode())
+            Results = """<html><head><title>Results</title></head><body>
+                    <h1>Results</h1><p>Connected from {}<p>Total Points = {}</body></html>""".format(Client,ClientPoints)
+            connectionSocket.send(Results.encode())
         else:
-            exit(1)
+            print ('Bad Request')
+            connectionSocket.close()
+            return
 
     else:
         try:
             integer = int(decoded)
             FileName = 'Questions/Question_' + decoded + '.html'
         except:
-            QuestionNumber, Answer, Client = decoded.split(',')
-            FileName = 'Questions/Question_' + QuestionNumber + '.html'
+            NextQuestionNumber, Answer, Client = decoded.split(',')
+            FileName = 'Questions/Question_' + NextQuestionNumber + '.html'
 
             if Answer in Answers:
-                AnswerInfo[int(QuestionNumber) - 1][Client] = 'true'
+                AnswerInfo[int(NextQuestionNumber) - 2][Client] = 'true'
             else:
-                AnswerInfo[int(QuestionNumber) - 1][Client] = 'false'
+                AnswerInfo[int(NextQuestionNumber) - 2][Client] = 'false'
 
         SendData = ''
         try:
