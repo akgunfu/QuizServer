@@ -11,10 +11,12 @@ QuizServerSocket.listen(1)
 Answers = ['trump', 'staryu', 'oak', 'rengar', 'hioneum', 'dubrovnik', '97', 'depp', 'tail', 'franklin']
 AnswerInfo = [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}]
 
+clients = []
+
 
 def handleRequest(connectionSocket, address):
-    client = address[0]
-    print('Quiz Server Connected From', client)
+    client = address[0] + ':' + str(address[1])
+    print('Connected from:', client)
 
     try:
         message = connectionSocket.recv(1024)
@@ -23,8 +25,13 @@ def handleRequest(connectionSocket, address):
         connectionSocket.close()
         return
 
-    print(message)
+    print("Message recieved from multiplexer server:",message.decode())
     decoded = message.decode()
+    if decoded[0] == "1":
+        clients.append(decoded[1:])
+        print(decoded[1:],"is appended to clients list.")
+    decoded = decoded[0]
+
 
     if decoded[0] == '/':
         if re.search(r"/Results*", decoded):
@@ -41,6 +48,7 @@ def handleRequest(connectionSocket, address):
             Results = """<html><head><title>Results</title></head><body>
                     <h1>Results</h1><p>Connected from {}<p>Total Points = {}</body></html>""".format(Client,ClientPoints)
             connectionSocket.send(Results.encode())
+            print("Result of client", address , ClientPoints)
         else:
             print ('Bad Request')
             connectionSocket.close()
@@ -69,7 +77,7 @@ def handleRequest(connectionSocket, address):
 
         connectionSocket.send(SendData.encode())
 
-    connectionSocket.close()
+    #connectionSocket.close()
 
 
 while True:
