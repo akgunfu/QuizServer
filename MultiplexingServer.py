@@ -11,8 +11,12 @@ MultiplexingServerSocket = socket(AF_INET,SOCK_STREAM)
 MultiplexingServerSocket.bind((MultiplexingServerName, MultiplexingServerPort))
 MultiplexingServerSocket.listen(1)
 
+clients = []
+
+lastClient = ""
 
 def handleGetRequest (connectionSocket, address, request):
+    global lastClient
     print("Handling GET request:")
     client = address[0] + ':' + str(address[1])
     print(" Connected client(browser) address:",client)
@@ -29,8 +33,10 @@ def handleGetRequest (connectionSocket, address, request):
         QuizServerSocket.send(questionNumber.encode())
         print(" Request for question number:",questionNumber,"is sent to quiz server")
         if(questionNumber=="1"):
-            print(" We must send this client address:",client,"to the web server, create a container to contain the answers and points.")
+            print(" We must send this client address:",client,"to the web server, create containers to contain the answers and points.")
+            clients.append(client)
             QuizServerSocket.send(client.encode())
+            lastClient = client
         try:
             Question = QuizServerSocket.recv(1024) #Question is the HTML file
             print(" HTML page for Question", questionNumber, "is received from quiz server.")
@@ -50,10 +56,15 @@ def handleGetRequest (connectionSocket, address, request):
 
 def handlePostRequest (connectionSocket, address, request, postData):
     print("Handling POST request")
-    questionNumberOrPath = request['Path'].split('_')[-1].split('.')[0]
+    checker = None
+    questionNumber = request['Path'].split('_')[-1].split('.')[0]
     #client = address[0]
     client = address[0] + ':' + str(address[1])
-    data = questionNumberOrPath + ',' + postData + ',' + client
+    if(client not in clients):
+        client = lastClient
+        checker = True
+    print(" Client address:",client)
+    data = questionNumber + ',' + postData + ',' + client
     try:
         QuizServerSocket = socket(AF_INET, SOCK_STREAM)
         QuizServerSocket.connect((QuizServerName, QuizServerPort))
@@ -68,15 +79,18 @@ def handlePostRequest (connectionSocket, address, request, postData):
         except:
             print('Can not get the correct answer from the server')
 
+        if(checker == True):
+            connectionSocket.close()
+            print(" Closing socket")
         #QuizServerSocket.close()
 
     except:
         print('Can not send answer to the server')
 
 
+
 def handleRequest (connectionSocket, address):
     print("Handling request:")
-    global how_many_clients
     client = address[0] + ':' + str(address[1])
     print("    Web page opened, thread created for client(browser):", client)
     while True:
@@ -110,7 +124,6 @@ def handleRequest (connectionSocket, address):
             handlePostRequest(connectionSocket, address, request, postData)
             break
 
-    #connectionSocket.close()
 
 
 while True:
@@ -120,9 +133,12 @@ while True:
     ConnectionSocket, address =  MultiplexingServerSocket.accept()
     ConnectionSocket.settimeout(30)
 
+    currentClient = address[0] + ':' + str(address[1])
+
     print("Web page opened, attempting to start a new thread for adress:",address)
     if(address!=""):
         _thread.start_new_thread(handleRequest, (ConnectionSocket, address))
+
 
 
 

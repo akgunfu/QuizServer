@@ -1,4 +1,5 @@
 from socket import *
+import sys
 import re
 
 QuizServerName = 'localhost'
@@ -13,10 +14,14 @@ AnswerInfo = [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}]
 
 clients = []
 
+clientsAnswers = []
+
+clientPoints = 0
+
 
 def handleRequest(connectionSocket, address):
     client = address[0] + ':' + str(address[1])
-    print('Connected from:', client)
+    #print('Connected from:', client)
 
     try:
         message = connectionSocket.recv(1024)
@@ -27,63 +32,56 @@ def handleRequest(connectionSocket, address):
 
     print("Message recieved from multiplexer server:",message.decode())
     decoded = message.decode()
-    if decoded[0] == "1":
+    if(decoded == "/favicon"):
+        print("This server architechture is not compatible with this browser. Please try another browser.")
+        print("Closing server...")
+        sys.exit()
+    if (decoded[0] == "1" and decoded[1]!="0"):
         clients.append(decoded[1:])
         print(decoded[1:],"is appended to clients list.")
-    decoded = decoded[0]
+        decoded = decoded[0]
+        FileName = 'Questions/Question_1.html'
+    if(len(decoded)!=1):
+        NextQuestionNumber, Answer, Client = decoded.split(',')
+        FileName = 'Questions/Question_' + NextQuestionNumber + '.html'
 
 
-    if decoded[0] == '/':
-        if re.search(r"/Results*", decoded):
-            Client = decoded.split(',')[-1]
-            print('Results are requested by', Client)
-            ClientPoints = 0
-            for k in AnswerInfo:
-                if Client in k:
-                    if k[Client] == 'true':
-                        ClientPoints += 1
-                else:
-                    print('Client did not participate in this question.')
-                    continue
-            Results = """<html><head><title>Results</title></head><body>
-                    <h1>Results</h1><p>Connected from {}<p>Total Points = {}</body></html>""".format(Client,ClientPoints)
-            connectionSocket.send(Results.encode())
-            print("Result of client", address , ClientPoints)
-        else:
-            print ('Bad Request')
-            connectionSocket.close()
-            return
+        clientsAnswers.append(Answer)
+        print("Given answer:",Answer)
+        global clientPoints
 
-    else:
-        try:
-            integer = int(decoded)
-            FileName = 'Questions/Question_' + decoded + '.html'
-        except:
-            NextQuestionNumber, Answer, Client = decoded.split(',')
-            FileName = 'Questions/Question_' + NextQuestionNumber + '.html'
+        if(Answer == "trump"):clientPoints += 10
+        if (Answer == "staryu"):clientPoints += 10
+        if (Answer == "oak"):clientPoints += 10
+        if (Answer == "rengar"):clientPoints += 10
+        if (Answer == "hioneum"):clientPoints += 10
+        if (Answer == "dubrovnik"):clientPoints += 10
+        if (Answer == "97"):clientPoints += 10
+        if (Answer == "depp"):clientPoints += 10
+        if (Answer == "tail"):clientPoints += 10
+        if (Answer == "franklin"):clientPoints += 10
 
-            if Answer in Answers:
-                AnswerInfo[int(NextQuestionNumber) - 2][Client] = 'true'
-            else:
-                AnswerInfo[int(NextQuestionNumber) - 2][Client] = 'false'
+        print("Points of client",Client,":",clientPoints)
 
-        SendData = ''
-        try:
-            with open(FileName, 'r') as MyFile:
-                SendData = MyFile.read().replace('\n', '')
-        except:
-            print ('Requested file can not be opened or found')
-            SendData = 'not-found'
+    SendData = ''
+    try:
+        with open(FileName, 'r') as MyFile:
+            SendData = MyFile.read().replace('\n', '')
+    except:
+        print ('Requested file can not be opened or found')
+        SendData = 'not-found'
 
-        connectionSocket.send(SendData.encode())
+
+    connectionSocket.send(SendData.encode())
+
 
     #connectionSocket.close()
 
 
 while True:
 
-    print ('Ready to serve on port', QuizServerPort)
+    #print ('Ready to serve on port', QuizServerPort)
     connectionSocket,address =  QuizServerSocket.accept()
     handleRequest(connectionSocket,address)
 
-QuizServerSocket.close()
+#QuizServerSocket.close()
